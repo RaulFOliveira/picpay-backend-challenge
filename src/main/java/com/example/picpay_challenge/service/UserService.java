@@ -4,29 +4,37 @@ import com.example.picpay_challenge.domain.user.User;
 import com.example.picpay_challenge.domain.user.UserRepository;
 import com.example.picpay_challenge.domain.user.UserRole;
 import com.example.picpay_challenge.domain.user.dto.CreateUserDTO;
+import com.example.picpay_challenge.domain.user.dto.GetSimpleUserDTO;
 import com.example.picpay_challenge.infra.exceptions.DocumentAlreadyExistsException;
 import com.example.picpay_challenge.infra.exceptions.DocumentNotValidException;
 import com.example.picpay_challenge.infra.exceptions.EmailAlreadyExistsException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
-public class UserService {
+public class UserService implements UserDetailsService{
 
     @Autowired
     private UserRepository userRepository;
 
-    public User create(CreateUserDTO userData) {
+    public GetSimpleUserDTO create(CreateUserDTO userData) {
         validateDocument(userData.document(), userData.role());
         validateEmail(userData.email());
 
-        System.out.println(userData.fullName());
         User user = new User(userData);
+        String encryptedPassword = new BCryptPasswordEncoder().encode(userData.password());
+        user.setPassword(encryptedPassword);
+
         User userCreated = userRepository.save(user);
-        return user;
+        return new GetSimpleUserDTO(userCreated.getId(), userCreated.getFullName(), userCreated.getBalance());
     }
 
     private void validateDocument(String document, UserRole role) {
@@ -51,7 +59,25 @@ public class UserService {
         }
     }
 
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public List<GetSimpleUserDTO> getAllUsers() {
+        List<User> users = userRepository.findAll();
+
+        return users.stream()
+                .map(user -> new GetSimpleUserDTO(user.getId(), user.getFullName(), user.getBalance()))
+                .toList();
+    }
+
+    public User getUserById(UUID id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado."));
+    }
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        Optional<User> user = userRepository.findByEmail(username);
+        return user.orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado."));
+    }
+
+    public void updateUsers(List<User> usersToUpdate) {
+        userRepository.saveAll(usersToUpdate);
     }
 }
