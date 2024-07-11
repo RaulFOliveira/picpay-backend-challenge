@@ -26,6 +26,9 @@ public class TransferController {
 
     @GetMapping
     public ResponseEntity<List<Transfer>> getAllTransfers() {
-        return ResponseEntity.ok(service.getAllTransfers());
+        List<Transfer> transfers = service.getAllTransfers();
+        return transfers.isEmpty() ?
+                ResponseEntity.noContent().build() :
+                ResponseEntity.ok(transfers);
     }
 }
